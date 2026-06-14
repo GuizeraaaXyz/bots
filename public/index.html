@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft Bots Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .status-online {
+            box-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+        }
+        
+        .status-offline {
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+        }
+        
+        .status-connecting {
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+        }
+        
+        .log-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .log-container::-webkit-scrollbar-track {
+            background: #1f2937;
+            border-radius: 10px;
+        }
+        
+        .log-container::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 10px;
+        }
+        
+        .log-container::-webkit-scrollbar-thumb:hover {
+            background: #6b7280;
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+        
+        .connecting-pulse {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-white mb-2">
+                <i class="fas fa-robot text-green-500"></i>
+                Minecraft Bots Dashboard
+            </h1>
+            <p class="text-gray-400">Gerencie seus bots Minecraft em tempo real</p>
+        </div>
+        
+        <!-- Control Buttons -->
+        <div class="flex justify-center gap-4 mb-8">
+            <button id="startAllBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition-all transform hover:scale-105 flex items-center gap-2">
+                <i class="fas fa-play"></i>
+                Iniciar Todos
+            </button>
+            <button id="stopAllBtn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition-all transform hover:scale-105 flex items-center gap-2">
+                <i class="fas fa-stop"></i>
+                Parar Todos
+            </button>
+            <button id="refreshBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-all transform hover:scale-105 flex items-center gap-2">
+                <i class="fas fa-sync-alt"></i>
+                Atualizar
+            </button>
+        </div>
+        
+        <!-- Bots Grid -->
+        <div id="botsGrid" class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <!-- Bots will be dynamically inserted here -->
+        </div>
+        
+        <!-- Global Logs -->
+        <div class="bg-gray-800 rounded-lg shadow-xl overflow-hidden">
+            <div class="bg-gray-700 px-6 py-4 border-b border-gray-600">
+                <h2 class="text-xl font-bold text-white">
+                    <i class="fas fa-terminal text-green-500"></i>
+                    Logs do Sistema
+                </h2>
+            </div>
+            <div id="globalLogs" class="log-container h-64 overflow-y-auto bg-gray-900 p-4">
+                <div class="text-gray-500 text-center">Aguardando logs...</div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
