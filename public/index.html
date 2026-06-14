@@ -2,108 +2,579 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minecraft Bots Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="/socket.io/socket.io.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>MINECRAFT BOT CONTROLLER | v2.0</title>
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=Space+Mono:wght@400;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        
         * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0A0F1A;
             font-family: 'Inter', sans-serif;
+            color: #E6EDF3;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
         }
-        
-        .status-online {
-            box-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+
+        /* Grid de fundo estilo terminal */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(0, 255, 157, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 157, 0.02) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 0;
         }
-        
-        .status-offline {
-            box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+
+        /* Efeito scanline */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.1) 0px,
+                rgba(0, 0, 0, 0.1) 2px,
+                transparent 2px,
+                transparent 4px
+            );
+            pointer-events: none;
+            z-index: 1;
         }
-        
-        .status-connecting {
-            box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+
+        .container {
+            position: relative;
+            z-index: 2;
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 24px 32px;
         }
-        
-        .log-container::-webkit-scrollbar {
+
+        /* Header Industrial */
+        .header {
+            margin-bottom: 32px;
+            border-bottom: 2px solid #1A2335;
+            padding-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .logo-section h1 {
+            font-family: 'Space Mono', monospace;
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -1px;
+            background: linear-gradient(135deg, #00FF9D 0%, #00D4FF 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: 0 0 20px rgba(0, 255, 157, 0.3);
+        }
+
+        .logo-section .subtitle {
+            font-family: 'Space Mono', monospace;
+            font-size: 12px;
+            color: #5A6A8A;
+            margin-top: 8px;
+            letter-spacing: 1px;
+        }
+
+        .stats-panel {
+            display: flex;
+            gap: 24px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .stat {
+            text-align: right;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: #5A6A8A;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #00FF9D;
+            text-shadow: 0 0 10px rgba(0, 255, 157, 0.5);
+        }
+
+        /* Control Bar */
+        .control-bar {
+            background: #0F1420;
+            border: 1px solid #1A2335;
+            border-radius: 8px;
+            padding: 16px 24px;
+            margin-bottom: 32px;
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            backdrop-filter: blur(10px);
+        }
+
+        .btn {
+            font-family: 'Space Mono', monospace;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00FF9D 0%, #00CC7D 100%);
+            color: #0A0F1A;
+            box-shadow: 0 0 15px rgba(0, 255, 157, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 25px rgba(0, 255, 157, 0.5);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #FF0055 0%, #CC0044 100%);
+            color: white;
+            box-shadow: 0 0 15px rgba(255, 0, 85, 0.3);
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 25px rgba(255, 0, 85, 0.5);
+        }
+
+        .btn-secondary {
+            background: #1A2335;
+            color: #8892B0;
+            border: 1px solid #2A3548;
+        }
+
+        .btn-secondary:hover {
+            background: #2A3548;
+            color: #00D4FF;
+        }
+
+        /* Bot Grid */
+        .bots-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        /* Terminal Card */
+        .terminal-card {
+            background: #0F1420;
+            border: 1px solid #1A2335;
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .terminal-card:hover {
+            border-color: #2A3548;
+            transform: translateY(-4px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .terminal-card.online {
+            border-top: 3px solid #00FF9D;
+        }
+
+        .terminal-card.offline {
+            border-top: 3px solid #FF0055;
+        }
+
+        .terminal-card.connecting {
+            border-top: 3px solid #00D4FF;
+        }
+
+        /* Terminal Header */
+        .terminal-header {
+            padding: 16px 20px;
+            background: rgba(10, 15, 26, 0.8);
+            border-bottom: 1px solid #1A2335;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .bot-name {
+            font-family: 'Space Mono', monospace;
+            font-size: 18px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-led {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse 2s infinite;
+        }
+
+        .status-led.online {
+            background: #00FF9D;
+            box-shadow: 0 0 8px #00FF9D;
+        }
+
+        .status-led.offline {
+            background: #FF0055;
+            box-shadow: 0 0 8px #FF0055;
+        }
+
+        .status-led.connecting {
+            background: #00D4FF;
+            box-shadow: 0 0 8px #00D4FF;
+            animation: blink 1s infinite;
+        }
+
+        .status-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 4px;
+            background: rgba(0, 0, 0, 0.4);
+        }
+
+        /* Terminal Body */
+        .terminal-body {
+            padding: 20px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #1A2335;
+            font-size: 13px;
+        }
+
+        .info-label {
+            color: #5A6A8A;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+        }
+
+        .info-value {
+            font-family: 'JetBrains Mono', monospace;
+            color: #00D4FF;
+        }
+
+        /* Command Input */
+        .command-section {
+            margin: 16px 0;
+        }
+
+        .command-input-group {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .command-input {
+            flex: 1;
+            background: #0A0F1A;
+            border: 1px solid #1A2335;
+            border-radius: 6px;
+            padding: 10px 12px;
+            color: #00FF9D;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .command-input:focus {
+            border-color: #00FF9D;
+            box-shadow: 0 0 10px rgba(0, 255, 157, 0.2);
+        }
+
+        .command-input::placeholder {
+            color: #2A3548;
+        }
+
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 11px;
+        }
+
+        /* Bot Actions */
+        .bot-actions {
+            display: flex;
+            gap: 8px;
+            margin: 16px 0;
+        }
+
+        .btn-bot {
+            flex: 1;
+            padding: 8px;
+            font-size: 11px;
+            background: #1A2335;
+            border: 1px solid #2A3548;
+            border-radius: 6px;
+            color: #8892B0;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Space Mono', monospace;
+        }
+
+        .btn-bot.start:hover {
+            background: #00FF9D;
+            color: #0A0F1A;
+            border-color: #00FF9D;
+        }
+
+        .btn-bot.stop:hover {
+            background: #FF0055;
+            color: white;
+            border-color: #FF0055;
+        }
+
+        /* Terminal Logs Area (CRT Effect) */
+        .logs-container {
+            margin-top: 16px;
+            background: #0A0F1A;
+            border: 1px solid #1A2335;
+            border-radius: 6px;
+            height: 240px;
+            overflow-y: auto;
+            padding: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            position: relative;
+        }
+
+        .logs-container::before {
+            content: '';
+            position: sticky;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 20px;
+            background: linear-gradient(to bottom, #0A0F1A, transparent);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .log-line {
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(26, 35, 53, 0.3);
+            display: flex;
+            gap: 12px;
+            font-size: 10px;
+        }
+
+        .log-time {
+            color: #5A6A8A;
+            flex-shrink: 0;
+        }
+
+        .log-message {
+            color: #8892B0;
+            word-break: break-word;
+        }
+
+        .log-message.error { color: #FF0055; }
+        .log-message.success { color: #00FF9D; }
+        .log-message.warn { color: #FFB800; }
+        .log-message.command { color: #00D4FF; }
+
+        /* Global Terminal */
+        .global-terminal {
+            background: #0A0F1A;
+            border: 2px solid #1A2335;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .terminal-titlebar {
+            background: #0F1420;
+            padding: 12px 20px;
+            border-bottom: 1px solid #1A2335;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-family: 'Space Mono', monospace;
+            font-size: 12px;
+        }
+
+        .terminal-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #FF0055;
+        }
+
+        .terminal-dot:nth-child(2) { background: #FFB800; }
+        .terminal-dot:nth-child(3) { background: #00FF9D; }
+
+        .global-logs {
+            height: 200px;
+            overflow-y: auto;
+            padding: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+        }
+
+        /* Scrollbar Personalizada */
+        ::-webkit-scrollbar {
             width: 8px;
+            height: 8px;
         }
-        
-        .log-container::-webkit-scrollbar-track {
-            background: #1f2937;
-            border-radius: 10px;
+
+        ::-webkit-scrollbar-track {
+            background: #0A0F1A;
         }
-        
-        .log-container::-webkit-scrollbar-thumb {
-            background: #4b5563;
-            border-radius: 10px;
+
+        ::-webkit-scrollbar-thumb {
+            background: #1A2335;
+            border-radius: 4px;
         }
-        
-        .log-container::-webkit-scrollbar-thumb:hover {
-            background: #6b7280;
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #2A3548;
         }
-        
+
+        /* Animações */
         @keyframes pulse {
-            0%, 100% {
-                opacity: 1;
-            }
-            50% {
-                opacity: 0.5;
-            }
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
-        
-        .connecting-pulse {
-            animation: pulse 1.5s ease-in-out infinite;
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        /* Cursor piscante para terminais */
+        .cursor-blink::after {
+            content: '_';
+            animation: blink 1s infinite;
+            color: #00FF9D;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container { padding: 16px; }
+            .bots-grid { grid-template-columns: 1fr; }
+            .header { flex-direction: column; align-items: flex-start; }
+            .stats-panel { width: 100%; justify-content: space-between; }
+            .control-bar { justify-content: center; }
+        }
+
+        /* Loading spinner */
+        .spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid #1A2335;
+            border-top-color: #00FF9D;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
     </style>
 </head>
-<body class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 min-h-screen">
-    <div class="container mx-auto px-4 py-8">
-        <!-- Header -->
-        <div class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-white mb-2">
-                <i class="fas fa-robot text-green-500"></i>
-                Minecraft Bots Dashboard
-            </h1>
-            <p class="text-gray-400">Gerencie seus bots Minecraft em tempo real</p>
-        </div>
-        
-        <!-- Control Buttons -->
-        <div class="flex justify-center gap-4 mb-8">
-            <button id="startAllBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition-all transform hover:scale-105 flex items-center gap-2">
-                <i class="fas fa-play"></i>
-                Iniciar Todos
-            </button>
-            <button id="stopAllBtn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition-all transform hover:scale-105 flex items-center gap-2">
-                <i class="fas fa-stop"></i>
-                Parar Todos
-            </button>
-            <button id="refreshBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-all transform hover:scale-105 flex items-center gap-2">
-                <i class="fas fa-sync-alt"></i>
-                Atualizar
-            </button>
-        </div>
-        
-        <!-- Bots Grid -->
-        <div id="botsGrid" class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            <!-- Bots will be dynamically inserted here -->
-        </div>
-        
-        <!-- Global Logs -->
-        <div class="bg-gray-800 rounded-lg shadow-xl overflow-hidden">
-            <div class="bg-gray-700 px-6 py-4 border-b border-gray-600">
-                <h2 class="text-xl font-bold text-white">
-                    <i class="fas fa-terminal text-green-500"></i>
-                    Logs do Sistema
-                </h2>
+<body>
+    <div class="container">
+        <!-- Header com stats em tempo real -->
+        <div class="header">
+            <div class="logo-section">
+                <h1>┌─┐┬ ┬┌┐┌┌┬┐┌─┐┌─┐┌┬┐<br>│  │ ││││ ││├┤ └─┐ │<br>└─┘└─┘┘└┘─┴┘└─┘└─┘ ┴</h1>
+                <div class="subtitle">BOT CONTROLLER v2.0 // SECURE TERMINAL</div>
             </div>
-            <div id="globalLogs" class="log-container h-64 overflow-y-auto bg-gray-900 p-4">
-                <div class="text-gray-500 text-center">Aguardando logs...</div>
+            <div class="stats-panel">
+                <div class="stat">
+                    <div class="stat-label">ONLINE</div>
+                    <div class="stat-value" id="onlineCount">0</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">OFFLINE</div>
+                    <div class="stat-value" style="color:#FF0055" id="offlineCount">0</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">TOTAL</div>
+                    <div class="stat-value" style="color:#00D4FF" id="totalCount">3</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Control Bar -->
+        <div class="control-bar">
+            <button class="btn btn-primary" id="startAllBtn">
+                <span>▶</span> START ALL
+            </button>
+            <button class="btn btn-danger" id="stopAllBtn">
+                <span>■</span> STOP ALL
+            </button>
+            <button class="btn btn-secondary" id="refreshBtn">
+                <span>⟳</span> REFRESH
+            </button>
+        </div>
+
+        <!-- Bots Grid -->
+        <div class="bots-grid" id="botsGrid">
+            <!-- Bots serão inseridos aqui -->
+        </div>
+
+        <!-- Global Terminal -->
+        <div class="global-terminal">
+            <div class="terminal-titlebar">
+                <div class="terminal-dot"></div>
+                <div class="terminal-dot"></div>
+                <div class="terminal-dot"></div>
+                <span style="margin-left: 8px;">root@system:~$</span>
+                <span style="color:#00FF9D; margin-left: auto;">GLOBAL_LOGS.log</span>
+            </div>
+            <div class="global-logs" id="globalLogs">
+                <div class="log-line">
+                    <span class="log-time">[System]</span>
+                    <span class="log-message">> Dashboard initialized. Waiting for commands...</span>
+                </div>
             </div>
         </div>
     </div>
-    
+
     <script src="script.js"></script>
 </body>
 </html>
