@@ -53,9 +53,7 @@ const botsConfig = [
 const bots = new Map();
 const botLogs = new Map();
 
-// Delay helper
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-const randomDelay = (baseMs, variationMs = 500) => delay(baseMs + Math.random() * variationMs);
 
 class BotManager {
   constructor(config) {
@@ -70,8 +68,9 @@ class BotManager {
     this.isProcessingQueue = false;
     this.logs = [];
     this.isRespawning = false;
-    this.reconnectTimer = null; // Timer para reconexão
-    this.isReconnecting = false; // Flag para evitar múltiplas tentativas
+    this.reconnectTimer = null;
+    this.isReconnecting = false;
+    this.loginAttempts = 0; // Rastrear tentativas de login
   }
 
   addLog(message, type = 'info') {
@@ -100,23 +99,24 @@ class BotManager {
       const command = this.commandQueue.shift();
       try {
         if (command.type === 'chat') {
-          await randomDelay(command.delay || 3000);
+          // Delay maior entre comandos (mínimo 4 segundos)
+          await delay(command.delay || 4000);
           this.bot.chat(command.message);
           this.addLog(`📤 Comando: ${command.message}`, 'command');
         } else if (command.type === 'function') {
-          await randomDelay(command.delay || 1000);
+          await delay(command.delay || 1000);
           await command.function();
-          this.addLog(`⚙️ Função executada: command.name || 'desconhecida'`, 'info');
+          this.addLog(`⚙️ Função executada`, 'info');
         }
       } catch (error) {
-        this.addLog(`❌ Erro ao executar comando: ${error.message}`, 'error');
+        this.addLog(`❌ Erro: ${error.message}`, 'error');
       }
     }
     
     this.isProcessingQueue = false;
   }
 
-  addCommand(message, delayMs = 3000, priority = false) {
+  addCommand(message, delayMs = 4000, priority = false) {
     const command = { type: 'chat', message, delay: delayMs };
     if (priority) {
       this.commandQueue.unshift(command);
@@ -126,18 +126,18 @@ class BotManager {
     this.processCommandQueue();
   }
 
-  // Calcula o delay baseado no número de tentativas
   getReconnectDelay() {
-    // Primeira tentativa: 60 segundos
+    // Aumentar delays para evitar antibot
     if (this.reconnectAttempts === 1) {
-      return 60000; // 1 minuto
+      return 90000; // 90 segundos na primeira tentativa
     }
-    // Tentativas seguintes: 30 segundos
-    return 30000; // 30 segundos
+    if (this.reconnectAttempts === 2) {
+      return 60000; // 60 segundos na segunda
+    }
+    return 45000; // 45 segundos nas demais
   }
 
   async connect() {
-    // Limpa qualquer timer pendente
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -149,7 +149,7 @@ class BotManager {
     
     this.status = 'connecting';
     this.updateStatus();
-    this.addLog(`🔌 Conectando ao servidor ${this.config.servidor}...`, 'info');
+    this.addLog(`🔌 Conectando ao servidor...`, 'info');
     
     try {
       this.bot = mineflayer.createBot({
@@ -158,13 +158,16 @@ class BotManager {
         username: this.config.nome,
         version: this.config.versao,
         auth: 'offline',
-        checkTimeoutInterval: 60000,
-        keepAlive: true
+        checkTimeoutInterval: 120000, // 2 minutos de timeout
+        keepAlive: true,
+        // Opções para parecer mais humano
+        viewDistance: 'normal',
+        chatLengthLimit: 256
       });
       
       this.setupEventHandlers();
     } catch (error) {
-      this.addLog(`❌ Erro ao criar bot: ${error.message}`, 'error');
+      this.addLog(`❌ Erro: ${error.message}`, 'error');
       this.status = 'offline';
       this.updateStatus();
       this.handleDisconnect();
@@ -172,108 +175,143 @@ class BotManager {
   }
   
   setupEventHandlers() {
+    let loginSent = false;
+    
     this.bot.on('login', () => {
-      this.addLog(`✅ Login realizado com sucesso!`, 'success');
-      this.reconnectAttempts = 0; // Reset contador ao conectar com sucesso
-      this.isReconnecting = false;
+      this.addLog(`✅ Conectado ao servidor!`, 'success');
+      this.reconnectAttempts = 0;
+      this.loginAttempts = 0;
       
+      // Delay ANTES de enviar o login (crucial!)
       setTimeout(() => {
-        this.addCommand(`/login ${this.config.senha}`, 3000);
-      }, 2000);
+        if (!loginSent && this.bot && this.status === 'connecting') {
+          loginSent = true;
+          this.addLog(`🔐 Enviando comando de login...`, 'info');
+          this.bot.chat(`/login ${this.config.senha}`);
+        }
+      }, 5000); // Espera 5 segundos antes de tentar logar
     });
     
     this.bot.on('spawn', async () => {
-      this.addLog(`🎮 Bot spawnou no jogo!`, 'success');
+      this.addLog(`🎮 Bot spawnou no mundo!`, 'success');
       this.status = 'online';
       this.updateStatus();
       this.isRespawning = false;
+      loginSent = false;
       
-      await randomDelay(4000);
-      this.addCommand('/skyblock', 5000);
-      await randomDelay(8000);
-      this.addCommand('/home farm', 6000);
-      await randomDelay(7000);
-      this.addCommand('/ac', 3000);
+      // Delay maior após spawn (10 segundos)
+      await delay(10000);
       
-      this.addLog(`✨ Sequência inicial de comandos concluída!`, 'success');
+      this.addLog(`🚀 Iniciando sequência de comandos...`, 'info');
+      
+      // Comando /skyblock com delay maior
+      this.addCommand('/skyblock', 8000);
+      
+      // Aguardar teleporte (12 segundos)
+      await delay(12000);
+      
+      // Comando /home farm
+      this.addCommand('/home farm', 8000);
+      
+      // Aguardar teleporte do home
+      await delay(10000);
+      
+      // Comando /ac
+      this.addCommand('/ac', 5000);
+      
+      this.addLog(`✨ Sequência inicial concluída!`, 'success');
     });
     
     this.bot.on('respawn', () => {
-      this.addLog(`🔄 Bot respawnou, aguardando para executar comandos...`, 'warn');
+      this.addLog(`🔄 Bot respawnou`, 'warn');
       this.isRespawning = true;
       
       setTimeout(() => {
         this.isRespawning = false;
-        this.addCommand('/ac', 4000);
-        this.addLog(`✨ Comandos pós-respawn executados`, 'success');
-      }, 8000);
+        this.addCommand('/ac', 6000);
+      }, 10000);
     });
     
     this.bot.on('resourcePack', (url, hash) => {
-      this.addLog(`📦 Resource pack solicitado, aceitando em 2 segundos...`, 'info');
+      this.addLog(`📦 Resource pack solicitado, aceitando...`, 'info');
       setTimeout(() => {
         if (this.bot) {
           this.bot.acceptResourcePack();
           this.addLog(`✅ Resource pack aceito!`, 'success');
         }
-      }, 2000);
+      }, 3000);
     });
     
     this.bot.on('message', (message) => {
       const text = message.toString();
-      this.addLog(`💬 ${text}`, 'chat');
+      this.addLog(`💬 ${text.substring(0, 100)}`, 'chat');
       
-      if (text.includes('kicked') || text.includes('Kicked')) {
-        this.addLog(`⚠️ Bot foi kickado! Aguardando reconexão...`, 'error');
+      // Detectar kick por antibot
+      if (text.includes('ANTIBOT') || text.includes('logou muito rápido')) {
+        this.addLog(`⚠️ Detectado kick por ANTIBOT!`, 'error');
+        this.addLog(`⏳ Aguardando 2 minutos antes de reconectar...`, 'warn');
       }
       
-      if (text.includes('teleport') || text.includes('Teleporting')) {
-        this.addLog(`🌀 Teleporte detectado, aguardando estabilização...`, 'info');
+      // Detectar quando o login foi bem sucedido
+      if (text.includes('Login realizado') || text.includes('logado com sucesso')) {
+        this.addLog(`✅ Login confirmado pelo servidor!`, 'success');
       }
     });
     
     this.bot.on('error', (err) => {
       this.addLog(`❌ Erro: ${err.message}`, 'error');
       if (err.message.includes('ECONNRESET') || err.message.includes('ETIMEDOUT')) {
-        this.addLog(`🔌 Problema de conexão, tentando reconectar...`, 'warn');
-        this.status = 'offline';
-        this.updateStatus();
         this.handleDisconnect();
       }
     });
     
     this.bot.on('end', (reason) => {
-      this.addLog(`🔌 Desconectado: ${reason || 'Razão desconhecida'}`, 'warn');
+      let reasonText = 'Razão desconhecida';
+      if (reason) {
+        try {
+          reasonText = typeof reason === 'string' ? reason : JSON.stringify(reason);
+        } catch(e) { reasonText = 'Erro ao parsear'; }
+      }
+      this.addLog(`🔌 Desconectado: ${reasonText.substring(0, 200)}`, 'warn');
       this.status = 'offline';
       this.updateStatus();
       this.handleDisconnect();
     });
     
     this.bot.on('kicked', (reason) => {
-      this.addLog(`👢 Kickado: ${reason}`, 'error');
+      let reasonText = 'Razão desconhecida';
+      if (reason) {
+        try {
+          reasonText = typeof reason === 'string' ? reason : JSON.stringify(reason);
+        } catch(e) { reasonText = 'Erro ao parsear'; }
+      }
+      this.addLog(`👢 Kickado: ${reasonText.substring(0, 200)}`, 'error');
       this.status = 'offline';
       this.updateStatus();
-      this.handleDisconnect();
+      
+      // Delay EXTRA longo após kick (2-3 minutos)
+      const kickDelay = 120000; // 2 minutos
+      this.addLog(`⏳ Aguardando ${kickDelay/1000} segundos antes de reconectar...`, 'warn');
+      
+      setTimeout(() => {
+        this.handleDisconnect();
+      }, kickDelay);
     });
   }
   
   handleDisconnect() {
-    // Evita múltiplas tentativas simultâneas
     if (this.isReconnecting) {
-      this.addLog(`⏳ Já existe uma tentativa de reconexão em andamento...`, 'warn');
       return;
     }
     
-    // Se desconexão foi manual, não reconecta
     if (!this.autoReconnect) {
       this.addLog(`🔒 Reconexão automática desativada`, 'info');
       return;
     }
     
-    // Verifica limite de tentativas
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      this.addLog(`❌ Número máximo de tentativas (${this.maxReconnectAttempts}) atingido.`, 'error');
-      this.addLog(`💡 Clique em "Iniciar" manualmente para tentar novamente.`, 'info');
+      this.addLog(`❌ Máximo de ${this.maxReconnectAttempts} tentativas atingido.`, 'error');
+      this.addLog(`💡 Clique em START manualmente para tentar novamente.`, 'info');
       this.status = 'offline';
       this.updateStatus();
       return;
@@ -285,13 +323,12 @@ class BotManager {
     const delayMs = this.getReconnectDelay();
     const delaySeconds = delayMs / 1000;
     
-    this.addLog(`🔄 Tentativa de reconexão ${this.reconnectAttempts}/${this.maxReconnectAttempts}`, 'warn');
-    this.addLog(`⏱️ Aguardando ${delaySeconds} segundos antes de tentar novamente...`, 'info');
+    this.addLog(`🔄 Tentativa ${this.reconnectAttempts}/${this.maxReconnectAttempts}`, 'warn');
+    this.addLog(`⏱️ Aguardando ${delaySeconds} segundos...`, 'info');
     
-    // Agenda a reconexão
     this.reconnectTimer = setTimeout(() => {
       this.isReconnecting = false;
-      this.addLog(`🔄 Iniciando tentativa de reconexão ${this.reconnectAttempts}...`, 'info');
+      this.addLog(`🔄 Reconectando (tentativa ${this.reconnectAttempts})...`, 'info');
       this.connect();
     }, delayMs);
   }
@@ -299,7 +336,6 @@ class BotManager {
   disconnect() {
     this.autoReconnect = false;
     
-    // Limpa timer pendente
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -312,12 +348,11 @@ class BotManager {
     
     this.status = 'offline';
     this.updateStatus();
-    this.addLog(`⏹️ Bot desconectado manualmente`, 'info');
+    this.addLog(`⏹️ Bot parado manualmente`, 'info');
     this.reconnectAttempts = 0;
     this.isReconnecting = false;
   }
   
-  // Método para resetar e iniciar manualmente
   manualStart() {
     this.autoReconnect = true;
     this.reconnectAttempts = 0;
@@ -328,6 +363,7 @@ class BotManager {
       this.reconnectTimer = null;
     }
     
+    this.addLog(`🔄 Reinicialização manual solicitada`, 'info');
     this.connect();
   }
   
@@ -338,11 +374,8 @@ class BotManager {
           this.bot.chat(command);
           this.addLog(`📤 Comando manual: ${command}`, 'command');
         }
-      }, 1000);
+      }, 1500);
       return true;
-    } else if (this.isRespawning) {
-      this.addLog(`⏳ Bot está respawnando, aguarde alguns segundos`, 'warn');
-      return false;
     }
     return false;
   }
@@ -362,8 +395,7 @@ class BotManager {
       nome: this.config.nome,
       status: this.status,
       logs: this.logs.slice(0, 50),
-      reconnectAttempts: this.reconnectAttempts,
-      nextReconnectDelay: this.autoReconnect && this.reconnectAttempts > 0 ? this.getReconnectDelay() : null
+      reconnectAttempts: this.reconnectAttempts
     };
   }
 }
@@ -394,7 +426,7 @@ app.get('/api/bots/stats', (req, res) => {
 app.post('/api/bot/:id/start', (req, res) => {
   const bot = bots.get(parseInt(req.params.id));
   if (bot) {
-    bot.manualStart(); // Usa o novo método manualStart
+    bot.manualStart();
     res.json({ success: true, message: `Bot ${bot.config.nome} iniciando` });
   } else {
     res.status(404).json({ success: false, message: 'Bot não encontrado' });
@@ -445,14 +477,13 @@ app.get('/api/logs/:id', (req, res) => {
   }
 });
 
-// Rota principal
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Socket.IO
 io.on('connection', (socket) => {
-  console.log('📡 Cliente conectado ao dashboard');
+  console.log('📡 Cliente conectado');
   
   const allStats = Array.from(bots.values()).map(bot => bot.getStats());
   socket.emit('initialData', allStats);
@@ -462,18 +493,13 @@ io.on('connection', (socket) => {
   });
 });
 
-// Inicia o servidor
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`\n✅ Dashboard rodando em http://localhost:${PORT}`);
-  console.log(`📊 Sistema de bots pronto! Use o dashboard para controlar os bots.\n`);
-  console.log(`🤖 Bots configurados:`);
-  botsConfig.forEach(bot => {
-    console.log(`   - ${bot.nome} (${bot.servidor})`);
-  });
-  console.log(`\n🔄 Sistema de reconexão:`);
-  console.log(`   - 1ª tentativa: 60 segundos`);
-  console.log(`   - Demais tentativas: 30 segundos`);
-  console.log(`   - Máximo: 10 tentativas`);
-  console.log(`\n💡 Dica: Clique em "Iniciar Todos" no dashboard para começar.\n`);
+  console.log(`\n✅ Dashboard: http://localhost:${PORT}`);
+  console.log(`\n🤖 Configuração ANTI-ANTIBOT:`);
+  console.log(`   - Delay antes do login: 5 segundos`);
+  console.log(`   - Delay entre comandos: 4-8 segundos`);
+  console.log(`   - Delay pós-spawn: 10 segundos`);
+  console.log(`   - Delay pós-kick: 2 minutos`);
+  console.log(`   - Reconexão: 90s → 60s → 45s\n`);
 });
